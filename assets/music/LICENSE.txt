@@ -1,0 +1,1 @@
+Original Little Property Parade composition and offline synthesized recording created for Estate Rise, approved by the project owner. No third-party samples or recordings. May be used, modified and redistributed with the game. Original 24-bit PCM audio samples are unchanged; only WAV_EXTENSIBLE header was losslessly rewrapped as standard PCM WAV for Godot.

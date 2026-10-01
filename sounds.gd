@@ -10,6 +10,7 @@ const CLIPS = {
 	"click": preload("res://assets/sounds/click.wav"),
 	"win": preload("res://assets/sounds/win.wav")
 }
+const MUSIC = preload("res://assets/music/Little_Property_Parade_Loop.wav")
 const GAP_MS = 80
 var muted = false
 var unlocked = false
@@ -17,6 +18,7 @@ var settings_path = "user://estate-rise-audio.cfg"
 var players: Array[AudioStreamPlayer] = []
 var cursor = 0
 var last_play_ms = -10000
+var music: AudioStreamPlayer
 
 func _ready() -> void:
 	unlocked = not OS.has_feature("web")
@@ -31,10 +33,24 @@ func _ready() -> void:
 		add_child(player)
 		players.append(player)
 
+	music = AudioStreamPlayer.new()
+	music.stream = MUSIC
+	music.autoplay = false
+	music.volume_db = -20.0
+	music.max_polyphony = 1
+	if OS.has_feature("web"):
+		music.playback_type = AudioServer.PLAYBACK_TYPE_SAMPLE
+	add_child(music)
+
+func start_music() -> void:
+	if unlocked and not muted and music != null and not music.playing:
+		music.play()
+
 func user_gesture() -> void:
 	# Godot resumes its Web AudioContext from browser input callbacks.
 	# Until that first pointer/key event, no clip is allowed to start.
 	unlocked = true
+	start_music()
 
 func play(kind: String, priority: bool = false) -> bool:
 	if muted or not unlocked or not CLIPS.has(kind) or players.is_empty():
@@ -54,6 +70,7 @@ func play(kind: String, priority: bool = false) -> bool:
 	return true
 
 func stop_all() -> void:
+	# Restart/victory clear interaction clips while the single music loop continues.
 	for player in players:
 		player.stop()
 
@@ -61,7 +78,10 @@ func toggle_mute() -> void:
 	muted = not muted
 	if muted:
 		stop_all()
+		if music != null:
+			music.stop()
 	else:
+		start_music()
 		play("click", true)
 	var cfg = ConfigFile.new()
 	cfg.set_value("audio", "muted", muted)

@@ -462,7 +462,7 @@ func english(s: String) -> String:
 		"开始交易":"Start trading", "再玩一次":"Play again", "最佳：":"Best: ", "游戏时间":"TIME", "可用资金":"CASH",
 		"花园小屋":"Cottage", "林荫联排":"Townhouse", "湖畔别墅":"Villa", "景观公馆":"Residence",
 		"累计交易利润":"Trading profit ", "梦想豪宅":"Mansion", "林荫街区":"Lake District",
-		"继续积累":"Need ", "挂牌剩余":"Expires in ", "即将下架":"Expiring soon", "现金进度":"Cash progress ",
+		"继续积累":"Need ", "挂牌剩余":"Expires in ", "现金进度":"Cash progress ",
 		"资金不足":"Not enough cash", "还需要":"Need ", "豪宅目标":"Mansion goal", "已买入":"Bought ",
 		"总资产":"Equity ", "售出":"Sold ", "成交":"Sales ", "用时":"Time: ", "完成":"Closed ",
 		"浮盈":"Gain ", "浮亏":"Loss ", "盈利":"Profit ", "亏损":"Loss ", "成本":"Cost ", "现价":"Price ",
@@ -566,8 +566,6 @@ func _draw_mansion() -> void:
 
 func _draw_home(h: Dictionary) -> void:
 	var p = lots[h.slot]
-	if h.id == hover_id:
-		draw_ellipse(p+Vector2(0,2),Vector2(42,14),Color("c3ca79"))
 	_sprite(h.tier,Rect2(p-Vector2(43,70),Vector2(86,74)),Color.WHITE,h.owned)
 	var tag = Rect2(p-Vector2(46,96),Vector2(92,26))
 	rounded(tag,CREAM,10,Color("e08b10") if h.owned else INK)
@@ -578,8 +576,6 @@ func _draw_home(h: Dictionary) -> void:
 	centered(money(h.price),p+Vector2(8,-78),15,INK)
 	if h.owned:
 		centered("持有",p+Vector2(0,22),12,INK)
-	elif h.life-h.age < 8:
-		centered("即将下架",p+Vector2(0,22),12,Color("a24023"))
 
 func _draw_hud() -> void:
 	# All HUD elements are overlays inside the full-window game scene.

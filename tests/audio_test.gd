@@ -23,8 +23,17 @@ func run() -> void:
 	game.sounds.sound_played.connect(func(kind): events.append(kind))
 	game.sounds.unlocked = false
 	check(not game.sounds.play("buy") and events.is_empty(),"no audio before user gesture")
+	check(not game.sounds.music.playing,"background music waits for user gesture")
+	print("MUSIC_IMPORT: ",game.sounds.MUSIC.loop_mode," begin=",game.sounds.MUSIC.loop_begin," end=",game.sounds.MUSIC.loop_end," rate=",game.sounds.MUSIC.mix_rate," duration=",game.sounds.MUSIC.get_length())
+	check(game.sounds.MUSIC.loop_mode==AudioStreamWAV.LOOP_FORWARD and game.sounds.MUSIC.loop_begin==0 and game.sounds.MUSIC.loop_end==1440000 and is_equal_approx(game.sounds.MUSIC.get_length(),30.0),"full 30-second WAV forward loop")
+	check(game.sounds.music.volume_db < game.sounds.players[0].volume_db and game.sounds.music.max_polyphony==1,"background music quieter and single voice")
 	game.sounds.user_gesture()
 	check(game.sounds.unlocked,"first gesture unlocks")
+	check(game.sounds.music.playing,"first gesture starts music")
+	var music_id=game.sounds.music.get_instance_id()
+	for i in range(20):game.sounds.user_gesture()
+	game.restart();game.set_language("en",false)
+	check(game.sounds.music.get_instance_id()==music_id and game.sounds.music.playing,"repeated input restart and language retain one music player")
 	for kind in game.sounds.CLIPS:
 		var clip = game.sounds.CLIPS[kind]
 		check(clip is AudioStreamWAV and clip.get_length() < 1.0,"baked short WAV: "+kind)
@@ -52,6 +61,7 @@ func run() -> void:
 	game.sounds.play("buy");game.sounds.play("win",true)
 	check(game.sounds.muted and events.size()==before,"mute blocks all priorities")
 	check(game.sounds.players.all(func(p):return not p.playing),"mute stops active voices")
+	check(not game.sounds.music.playing,"mute stops background music")
 	game.restart();check(game.sounds.muted,"restart preserves mute")
 	var bank=load("res://sounds.gd").new()
 	bank.settings_path=game.sounds.settings_path;root.add_child(bank)
@@ -59,6 +69,7 @@ func run() -> void:
 	check(bank.muted,"new instance reloads saved mute")
 	bank.free();game.click_at(game.mute_rect().get_center())
 	check(not game.sounds.muted and events.back()=="click","unmute confirms softly")
+	check(game.sounds.music.playing,"unmute restores background music without extra player")
 	game.cash=11000;game.buy_mansion()
 	check(game.won and events.back()=="win","victory interrupts cooldown for celebration")
 	game.help_open=true;game.click_at(game.mute_rect().get_center())

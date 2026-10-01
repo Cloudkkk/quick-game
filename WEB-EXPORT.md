@@ -14,9 +14,12 @@
 mkdir -p dist
 godot --headless --path . --export-release Web dist/index.html
 python3 tools/compress-web.py dist
+python3 tools/patch-web-loop.py dist/index.js
 ```
 
-第二步压缩 WASM，同时复制 `tools/wasm-loader.js` 到产物目录。HTML 预设已在引擎脚本之前引用 `wasm-loader.js?v=2`。
+压缩脚本压缩 WASM，同时复制 `tools/wasm-loader.js` 到产物目录。HTML 预设已在引擎脚本之前引用 `wasm-loader.js?v=2`。
+
+`patch-web-loop.py` 为完整30秒背景音乐设置 Web Audio 原生 BufferSource 循环，避免 Godot4.5.1 Sample 播放依赖JS ended回调重启产生衔接间隔。只匹配 forward 且30秒的完整音乐片段；短音效保持原样。脚本校验已知模板两处构造点，模板变化时停止；重复执行安全。每次新导出都必须重新执行，发布保留处理后的 index.js。
 
 ## 必须保留的加载修复
 
