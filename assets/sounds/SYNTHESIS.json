@@ -1,0 +1,32 @@
+{
+  "buy": {
+    "seconds": 0.18,
+    "sample_rate": 44100,
+    "peak_dbfs": -9.9
+  },
+  "profit": {
+    "seconds": 0.34,
+    "sample_rate": 44100,
+    "peak_dbfs": -9.9
+  },
+  "loss": {
+    "seconds": 0.25,
+    "sample_rate": 44100,
+    "peak_dbfs": -9.9
+  },
+  "boop": {
+    "seconds": 0.21,
+    "sample_rate": 44100,
+    "peak_dbfs": -9.9
+  },
+  "click": {
+    "seconds": 0.075,
+    "sample_rate": 44100,
+    "peak_dbfs": -9.9
+  },
+  "win": {
+    "seconds": 0.78,
+    "sample_rate": 44100,
+    "peak_dbfs": -9.9
+  }
+}

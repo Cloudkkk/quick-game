@@ -1,0 +1,1 @@
+Original sound effects synthesized for Estate Rise from mathematical oscillators. No third-party samples, recordings or audio APIs are used. These effects and their synthesis source may be freely used, modified and redistributed with this game.
