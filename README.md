@@ -22,7 +22,7 @@ godot --path .
 
 包含买入 pop、盈利金币音、亏损短音、资金不足 boop、按钮轻点和胜利庆祝六种原创合成 WAV。右下角“声音 / 静音”开关会保存本地偏好；最多两路播放，普通音效间隔至少 80 毫秒。Web 音效等待首次点击、触摸或操作键输入后解锁，没有自动播放或背景音乐。
 
-最佳通关时间与静音偏好分别保存在 Godot 的 `user://` 目录，不保存进行中的局面。没有可用中文字体时使用 Godot 自带字体及英文文案；仓库不捆绑系统商业字体。
+最佳通关时间与静音偏好分别保存在 Godot 的 `user://` 目录，不保存进行中的局面。游戏内可点击顶部“EN / 中文”即时切换，语言选择单独保存在本地，重开和刷新后保留。初次根据浏览器语言选择，中文使用随游戏打包的 Noto Sans CJK SC（OFL 1.1），不依赖系统字体。
 
 ## 验证
 
@@ -33,7 +33,10 @@ mkdir -p evidence
 godot --headless --path . --log-file evidence/core.log --script res://tests/core_test.gd
 godot --headless --path . --log-file evidence/audio.log --script res://tests/audio_test.gd
 godot --headless --path . --log-file evidence/touch.log --script res://tests/touch_test.gd
+godot --headless --path . --log-file evidence/language.log --script res://tests/language_test.gd
 ```
+
+双语专项原生测试 38/38、实际 Mac Chrome 横竖屏 QA 40/40、正式无探针双语构建 15/15 已通过，覆盖动态交易文案、帮助与胜利、字形与文字边界、切换时状态不重置和刷新持久化。
 
 ## Web 导出
 

@@ -11,6 +11,8 @@ const BASES = [46.0, 260.0, 840.0, 2180.0]
 const NAMES = ["花园小屋", "林荫联排", "湖畔别墅", "景观公馆"]
 var MAP = Rect2(0, 0, 1200, 820)
 var MANSION = Vector2(1032, 205)
+var language = "en"
+var language_settings_path = "user://estate-rise-language.cfg"
 var font: Font
 var atlas: Texture2D
 var sprite_regions: Array[Rect2] = []
@@ -41,15 +43,14 @@ func _ready() -> void:
 	if test_mode:
 		sounds.settings_path = "res://evidence/audio-test.cfg"
 	add_child(sounds)
-	# Explicit macOS font bytes avoid Godot's broken SystemFont name resolution.
-	var local_font = FontFile.new()
-	font = ThemeDB.fallback_font
-	# Optional installed fonts only. No commercial font is bundled or required.
-	for font_path in ["/System/Library/Fonts/STHeiti Light.ttc", "C:/Windows/Fonts/msyh.ttc", "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"]:
-		if FileAccess.file_exists(font_path) and local_font.load_dynamic_font(font_path) == OK:
-			font = local_font
-			break
+	# Redistributable CJK font is part of the game on every platform.
+	font = load("res://assets/fonts/NotoSansCJKsc-Regular.otf")
+	if font == null:
+		font = ThemeDB.fallback_font
 	cjk_available = font.has_char(0x4f60)
+	if test_mode:
+		language_settings_path = "res://evidence/language-test.cfg"
+	load_language()
 	if ResourceLoader.exists("res://assets/buildings-q.png"):
 		atlas = load("res://assets/buildings-q.png")
 		prepare_sprite_regions()
@@ -57,6 +58,44 @@ func _ready() -> void:
 	update_layout()
 	_load_best()
 	restart()
+
+func detect_language(locale: String) -> String:
+	return "zh" if locale.to_lower().begins_with("zh") else "en"
+
+func load_language() -> void:
+	var locale = OS.get_locale()
+	if OS.has_feature("web"):
+		var browser_locale = JavaScriptBridge.eval("navigator.language || 'en'", true)
+		if browser_locale is String:
+			locale = browser_locale
+	language = detect_language(locale)
+	var cfg = ConfigFile.new()
+	if cfg.load(language_settings_path) == OK:
+		var saved = str(cfg.get_value("locale", "language", ""))
+		if saved in ["zh", "en"]:
+			language = saved
+	if language == "zh" and not cjk_available:
+		language = "en"
+	_sync_document_language()
+
+func set_language(value: String, persist: bool = true) -> void:
+	if value not in ["zh", "en"]:
+		return
+	language = value if value != "zh" or cjk_available else "en"
+	if persist:
+		var cfg = ConfigFile.new()
+		cfg.set_value("locale", "language", language)
+		cfg.save(language_settings_path)
+	_sync_document_language()
+	queue_redraw()
+
+func _sync_document_language() -> void:
+	if OS.has_feature("web"):
+		var locale = "zh-CN" if language == "zh" else "en"
+		JavaScriptBridge.eval("document.documentElement.lang = "+JSON.stringify(locale), true)
+
+func text(value: String) -> String:
+	return value if language == "zh" else english(value)
 
 func restart() -> void:
 	if sounds != null:
@@ -256,6 +295,9 @@ func update_layout() -> void:
 				lots.append(Vector2(sz.x*0.47+(i-j)*sz.x*0.094, sz.y*0.15+(i+j)*sz.y*0.088))
 	queue_redraw()
 
+func language_rect() -> Rect2:
+	return Rect2(MAP.size.x-284,12,80,36)
+
 func pause_rect() -> Rect2:
 	return Rect2(MAP.size.x-196,12,80,36)
 
@@ -281,6 +323,10 @@ func replay_rect() -> Rect2:
 	return Rect2(win_panel().position+Vector2(125,365),Vector2(240,44))
 
 func click_at(p: Vector2) -> void:
+	if language_rect().has_point(p):
+		set_language("en" if language == "zh" else "zh")
+		sounds.play("click")
+		return
 	if mute_rect().has_point(p):
 		sounds.toggle_mute()
 		return
@@ -355,15 +401,43 @@ func rounded(rect: Rect2, color: Color, radius: int = 12, border: Color = Color.
 		box.border_color = border
 	draw_style_box(box, rect)
 
-func label_at(s: String, p: Vector2, size: int = 18, color: Color = INK) -> void:
-	if not cjk_available:
-		s = english(s)
+func fitted_size(s: String, size: int, max_width: float) -> int:
+	var result = size
+	while result > 10 and font.get_string_size(s,HORIZONTAL_ALIGNMENT_LEFT,-1,result).x > max_width:
+		result -= 1
+	return result
+
+func label_at(s: String, p: Vector2, size: int = 18, color: Color = INK, max_width: float = -1) -> void:
+	s = text(s)
+	var available = MAP.size.x-p.x-12 if max_width < 0 else max_width
+	size = fitted_size(s,size,available)
 	draw_string(font, p, s, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
 
-func centered(s: String, p: Vector2, size: int = 18, color: Color = INK) -> void:
-	if not cjk_available:
-		s = english(s)
-	label_at(s, p-Vector2(font.get_string_size(s,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x/2,0), size, color)
+func centered(s: String, p: Vector2, size: int = 18, color: Color = INK, max_width: float = -1) -> void:
+	s = text(s)
+	var available = minf(p.x-12,MAP.size.x-p.x-12)*2 if max_width < 0 else max_width
+	size = fitted_size(s,size,available)
+	label_at(s, p-Vector2(font.get_string_size(s,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x/2,0), size, color, available)
+
+func wrapped_text(s: String, max_width: float, size: int) -> Array[String]:
+	var translated = text(s)
+	var parts: Array[String] = []
+	if language == "en":
+		for word in translated.split(" "):
+			parts.append(word+" ")
+	else:
+		for character in translated:
+			parts.append(character)
+	var lines: Array[String] = []
+	var line = ""
+	for part in parts:
+		if not line.is_empty() and font.get_string_size(line+part,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x > max_width:
+			lines.append(line.strip_edges())
+			line = ""
+		line += part
+	if not line.is_empty():
+		lines.append(line.strip_edges())
+	return lines
 
 func english(s: String) -> String:
 	var phrases = {
@@ -423,6 +497,8 @@ func _draw() -> void:
 		_draw_help()
 	if won:
 		_draw_win()
+	rounded(language_rect(),Color("ffffffe8"),10,INK)
+	centered("EN" if language == "zh" else "中文",language_rect().get_center()+Vector2(0,6),15,INK,68)
 	rounded(mute_rect(),Color("ffffffe8"),10,INK)
 	centered("静音" if sounds.muted else "声音",mute_rect().get_center()+Vector2(0,6),15,INK)
 
@@ -507,17 +583,19 @@ func _draw_home(h: Dictionary) -> void:
 
 func _draw_hud() -> void:
 	# All HUD elements are overlays inside the full-window game scene.
-	rounded(Rect2(12,12,352,42),Color("ffffffe8"),11,INK)
-	label_at("可用资金  "+money(cash),Vector2(24,39),20,INK)
-	label_at("%d 年 %d 月" % [int(elapsed)/12,int(elapsed)%12],Vector2(237,39),17,INK)
+	rounded(Rect2(12,12,292,42),Color("ffffffe8"),11,INK)
+	label_at("可用资金  "+money(cash),Vector2(24,39),20,INK,179)
+	label_at("%d 年 %d 月" % [int(elapsed)/12,int(elapsed)%12],Vector2(211,39),17,INK,82)
 	for rect in [pause_rect(),help_rect(),speed_rect()]:
 		rounded(rect,Color("ffffffe8"),10,INK)
 	centered("继续" if paused else "暂停",pause_rect().get_center()+Vector2(0,6),16,INK)
 	centered("玩法  H",help_rect().get_center()+Vector2(0,6),16,INK)
 	centered("速度 ×%d" % int(speed),speed_rect().get_center()+Vector2(0,6),15,INK)
-	var note = Rect2(12,MAP.size.y-43,mini(710,MAP.size.x-232),31)
+	var note = Rect2(12,MAP.size.y-64,mini(710,MAP.size.x-232),52)
 	rounded(note,Color("ffffffe0"),9)
-	label_at(feedback,note.position+Vector2(10,21),14,INK)
+	var lines = wrapped_text(feedback,note.size.x-20,13)
+	for i in range(mini(2,lines.size())):
+		label_at(lines[i],note.position+Vector2(10,20+i*19),13,INK,note.size.x-20)
 
 func _draw_hover() -> void:
 	for h in homes:
@@ -525,23 +603,23 @@ func _draw_hover() -> void:
 			continue
 		var p = Vector2(clampf(pointer.x+18,12,MAP.size.x-244),clampf(pointer.y+24,65,MAP.size.y-167))
 		rounded(Rect2(p,Vector2(228,108)),CREAM,10,INK)
-		label_at(NAMES[h.tier]+(" · 持有" if h.owned else " · 待售"),p+Vector2(12,24),16,INK)
-		label_at("现价 "+money(h.price),p+Vector2(12,49),15,INK)
+		label_at(NAMES[h.tier]+(" · 持有" if h.owned else " · 待售"),p+Vector2(12,24),16,INK,204)
+		label_at("现价 "+money(h.price),p+Vector2(12,49),15,INK,204)
 		var detail = "成本 %s · %s %s" % [money(h.cost),"浮盈" if h.price>=h.cost else "浮亏",money(absf(h.price-h.cost))] if h.owned else "挂牌剩余 %d 个月" % maxi(0,int(h.life-h.age))
-		label_at(detail,p+Vector2(12,73),12,INK)
-		label_at("点击立即卖出" if h.owned else "点击立即买入",p+Vector2(12,95),13,INK)
+		label_at(detail,p+Vector2(12,73),12,INK,204)
+		label_at("点击立即卖出" if h.owned else "点击立即买入",p+Vector2(12,95),13,INK,204)
 
 func _draw_help() -> void:
 	draw_rect(MAP,Color(0,0,0,0.40))
 	var rect = help_panel()
 	var p = rect.position
 	rounded(rect,CREAM,14,INK)
-	label_at("你的第一套房，从这里开始",p+Vector2(26,44),25,INK)
+	label_at("你的第一套房，从这里开始",p+Vector2(26,44),25,INK,528)
 	var lines = ["01   用 100 K 启动资金购买白色挂牌房屋。", "02   ▲ 表示上涨，▼ 表示下跌；价格会反复波动。", "03   持有房屋变为金色挂牌，点击即可卖出兑现。", "04   从小屋到别墅，逐步放大交易，积累现金。", "05   凑足豪宅现价，点击右上方豪宅完成挑战。"]
 	for i in range(lines.size()):
-		label_at(lines[i],p+Vector2(26,90+i*36),17,INK)
-	label_at("挂牌会下架，持有房产不会消失。没有租金收入。",p+Vector2(26,286),14,INK)
-	label_at("最佳："+("—" if best_months<0 else "%d年%d月" % [best_months/12,best_months%12]),p+Vector2(26,310),13,INK)
+		label_at(lines[i],p+Vector2(26,90+i*36),17,INK,528)
+	label_at("挂牌会下架，持有房产不会消失。没有租金收入。",p+Vector2(26,286),14,INK,528)
+	label_at("最佳："+("—" if best_months<0 else "%d年%d月" % [best_months/12,best_months%12]),p+Vector2(26,310),13,INK,528)
 	rounded(help_close_rect(),GOLD,9,INK)
 	centered("开始交易",help_close_rect().get_center()+Vector2(0,6),18,INK)
 
@@ -550,9 +628,9 @@ func _draw_win() -> void:
 	var rect = win_panel()
 	var p = rect.position
 	rounded(rect,CREAM,14,INK)
-	centered("梦想豪宅，正式属于你",p+Vector2(245,49),26,INK)
-	centered("用时 %d 年 %d 月 · 完成 %d 笔交易" % [int(elapsed)/12,int(elapsed)%12,deals],p+Vector2(245,86),17,INK)
+	centered("梦想豪宅，正式属于你",p+Vector2(245,49),26,INK,438)
+	centered("用时 %d 年 %d 月 · 完成 %d 笔交易" % [int(elapsed)/12,int(elapsed)%12,deals],p+Vector2(245,86),17,INK,438)
 	_sprite(3,Rect2(p+Vector2(130,116),Vector2(230,190)))
-	centered("累计交易利润 "+money(profit),p+Vector2(245,337),17,INK)
+	centered("累计交易利润 "+money(profit),p+Vector2(245,337),17,INK,438)
 	rounded(replay_rect(),GOLD,9,INK)
 	centered("再玩一次",replay_rect().get_center()+Vector2(0,6),18,INK)

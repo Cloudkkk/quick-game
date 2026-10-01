@@ -22,3 +22,12 @@ wasm.write_bytes(packed)
 print("WASM_RAW_BYTES", len(raw), "WASM_GZIP_BYTES", len(packed))
 
 shutil.copy2(Path(__file__).with_name("wasm-loader.js"), root / "wasm-loader.js")
+
+project_root = Path(__file__).resolve().parent.parent
+for source, name in [
+    (project_root / "assets/fonts/OFL.txt", "FONT-OFL.txt"),
+    (project_root / "assets/fonts/COPYRIGHT.txt", "FONT-COPYRIGHT.txt"),
+    (project_root / "assets/sounds/LICENSE.txt", "SOUND-LICENSE.txt"),
+]:
+    if source.is_file():
+        shutil.copy2(source, root / name)
